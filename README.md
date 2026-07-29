@@ -11,7 +11,13 @@ The zero costs shown by Pi are local display metadata only. Check your Anthropic
 
 ## Install
 
-Install the pinned GitHub release:
+Install the pinned npm release:
+
+```sh
+pi install npm:pi-claude-plan@1.8.1
+```
+
+Alternatively, install the matching GitHub release:
 
 ```sh
 pi install git:github.com/sunipan/pi-claude-plan@v1.8.1
@@ -28,19 +34,21 @@ Complete authorization in the browser, then select a `claude-plan/...` model usi
 
 Each user must complete their own OAuth login. No user credentials are committed to or distributed with this repository. The extension handles credentials stored by Pi, exchanges or refreshes them with `platform.claude.com`, and sends authenticated requests—including conversation context—to `api.anthropic.com`. Pi stores the credential separately under the provider ID `claude-plan`; it does not replace the built-in `anthropic` credential.
 
-To remove the package:
+To remove the npm package:
 
 ```sh
-pi remove git:github.com/sunipan/pi-claude-plan
+pi remove npm:pi-claude-plan
 ```
 
 ## Updating
 
-Releases are deliberately pinned. Install a newer tag explicitly after reviewing its source and release notes:
+Releases are deliberately pinned. Install a newer version explicitly after reviewing its source and release notes:
 
 ```sh
-pi install git:github.com/sunipan/pi-claude-plan@vX.Y.Z
+pi install npm:pi-claude-plan@X.Y.Z
 ```
+
+The matching Git tag can also be installed as `git:github.com/sunipan/pi-claude-plan@vX.Y.Z`.
 
 ## Versioning and upstream alignment
 
