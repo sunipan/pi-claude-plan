@@ -1,6 +1,6 @@
 {
   "name": "pi-claude-plan",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "type": "module",
   "description": "Unofficial Pi provider for attempting Claude Pro/Max plan routing without replacing Pi's built-in Anthropic provider.",
   "license": "MIT",
@@ -20,12 +20,15 @@
     "oauth"
   ],
   "pi": {
-    "extensions": ["./index.ts"]
+    "extensions": [
+      "./index.ts"
+    ]
   },
   "files": [
     "index.ts",
     "src",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE",
     "NOTICE.md"
   ],
@@ -50,8 +53,8 @@
     "@earendil-works/pi-coding-agent": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "0.82.1",
-    "@earendil-works/pi-coding-agent": "0.82.1",
+    "@earendil-works/pi-ai": "0.84.4",
+    "@earendil-works/pi-coding-agent": "0.84.4",
     "@types/node": "24.12.4",
     "typescript": "5.9.3",
     "vitest": "4.1.9"

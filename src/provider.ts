@@ -15,12 +15,29 @@ const ZERO_COST = {
   cacheWrite: 0,
 } as const;
 
+type AnthropicCompatWithFallbacks = NonNullable<
+  Model<"anthropic-messages">["compat"]
+> & {
+  allowedFallbackModels?: unknown;
+};
+
 function installedAnthropicProvider(): Provider<"anthropic-messages"> {
   // Pi's extension loader exposes providers/all but does not alias individual
   // provider subpaths. builtinProviders() constructs the same anthropicProvider().
   const provider = builtinProviders().find((candidate) => candidate.id === "anthropic");
   if (!provider) throw new Error("Pi's built-in Anthropic provider is unavailable");
   return provider as Provider<"anthropic-messages">;
+}
+
+function sanitizeCompat(
+  compat: Model<"anthropic-messages">["compat"],
+): Model<"anthropic-messages">["compat"] {
+  if (!compat) return compat;
+
+  const { allowedFallbackModels: _ignored, ...sanitized } =
+    compat as AnthropicCompatWithFallbacks;
+
+  return Object.keys(sanitized).length > 0 ? sanitized : undefined;
 }
 
 export function cloneAnthropicModels(
@@ -31,6 +48,7 @@ export function cloneAnthropicModels(
     provider: PROVIDER_ID,
     name: `${model.name} (Claude Plan)`,
     cost: { ...ZERO_COST },
+    compat: sanitizeCompat(model.compat),
   }));
 }
 

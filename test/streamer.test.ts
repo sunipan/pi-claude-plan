@@ -1,6 +1,8 @@
-import type { Context, Model } from "@earendil-works/pi-ai";
+import type { Api, Context, Model } from "@earendil-works/pi-ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { streamClaudePlan } from "../src/streamer.js";
+import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
+import { cloneAnthropicModels } from "../src/provider.js";
+import { streamClaudePlan, streamClaudePlanRaw } from "../src/streamer.js";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -108,6 +110,88 @@ describe("custom Anthropic streamer (offline)", () => {
         arguments: { path: "README.md" },
       },
     });
+  });
+
+
+
+  it("omits unsupported fallbacks while chaining payload, header, and response hooks", async () => {
+    const sourceProvider = builtinProviders().find(
+      (provider) => provider.id === "anthropic",
+    )!;
+    const sourceModel = sourceProvider
+      .getModels()
+      .find((model) => model.id === "claude-fable-5")!;
+    const anthropicSourceModel = sourceModel as Model<"anthropic-messages">;
+    expect(anthropicSourceModel.compat?.allowedFallbackModels?.length).toBeGreaterThan(0);
+
+    const model = cloneAnthropicModels(
+      sourceProvider as import("@earendil-works/pi-ai").Provider<"anthropic-messages">,
+    ).find((candidate) => candidate.id === sourceModel.id)!;
+    expect(model.compat?.allowedFallbackModels).toBeUndefined();
+
+    let requestHeaders = new Headers();
+    let requestPayload: Record<string, unknown> = {};
+    const payloadHook = vi.fn((payload: unknown, hookModel: Model<Api>) => ({
+      ...(payload as Record<string, unknown>),
+      metadata: { user_id: `offline-${hookModel.provider}` },
+    }));
+    const responseHook = vi.fn();
+    const responseText =
+      sse("message_start", {
+        type: "message_start",
+        message: { id: "msg_fallback_regression", usage: { input_tokens: 1, output_tokens: 0 } },
+      }) +
+      sse("content_block_start", {
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "text", text: "" },
+      }) +
+      sse("content_block_delta", {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "text_delta", text: "OK" },
+      }) +
+      sse("content_block_stop", { type: "content_block_stop", index: 0 }) +
+      sse("message_delta", {
+        type: "message_delta",
+        delta: { stop_reason: "end_turn", stop_sequence: null },
+        usage: { output_tokens: 1 },
+      }) +
+      sse("message_stop", { type: "message_stop" });
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      requestHeaders = new Headers(request.headers);
+      requestPayload = JSON.parse(await request.text()) as Record<string, unknown>;
+      return new Response(responseText, {
+        status: 200,
+        headers: { "content-type": "text/event-stream", "x-offline": "true" },
+      });
+    });
+
+    const events = [];
+    for await (const event of streamClaudePlanRaw(
+      model,
+      {
+        messages: [{ role: "user", content: "Reply with OK", timestamp: 0 }],
+      } as Context,
+      {
+        apiKey: "offline-oauth-token",
+        maxRetries: 0,
+        headers: { "x-host-hook": "present" },
+        onPayload: payloadHook,
+        onResponse: responseHook,
+      },
+    )) {
+      events.push(event);
+    }
+
+    expect(payloadHook).toHaveBeenCalledOnce();
+    expect(responseHook).toHaveBeenCalledOnce();
+    expect(requestHeaders.get("x-host-hook")).toBe("present");
+    expect(requestPayload).not.toHaveProperty("fallbacks");
+    expect(requestPayload.metadata).toEqual({ user_id: "offline-claude-plan" });
+    expect(events.at(-1)).toMatchObject({ type: "done" });
   });
 
   it("rejects colliding tool names before starting a request", () => {
