@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   CLAUDE_AGENT_IDENTITY,
   REQUIRED_BETAS,
-  USER_AGENT,
 } from "../src/constants.js";
 import {
   buildAnthropicClientOptions,
@@ -37,7 +36,7 @@ describe("Pi request fingerprint", () => {
       system:
         "You are an expert coding assistant operating inside pi, a coding agent harness.\n\nKeep this instruction.",
       messages: [{ role: "user", content: "hello world test message" }],
-    }) as { system: Array<{ text: string }> };
+    }, "2.1.87") as { system: Array<{ text: string }> };
     expect(payload.system).toHaveLength(3);
     expect(payload.system[0]?.text).toBe(
       "x-anthropic-billing-header: cc_version=2.1.87.6ff; cc_entrypoint=sdk-cli; cch=4ffc3;",
@@ -130,6 +129,7 @@ describe("Pi request fingerprint", () => {
         aUtHoRiZaTiOn: "must-not-pass-through",
         "X-API-KEY": "must-not-pass-through",
       },
+      "2.1.87",
     ) as {
       defaultQuery: Record<string, string>;
       defaultHeaders: Record<string, string>;
@@ -140,7 +140,7 @@ describe("Pi request fingerprint", () => {
       ...REQUIRED_BETAS,
       "caller-value",
     ]);
-    expect(options.defaultHeaders["user-agent"]).toBe(USER_AGENT);
+    expect(options.defaultHeaders["user-agent"]).toBe("claude-cli/2.1.87 (external, cli)");
     expect(options.defaultHeaders["x-model"]).toBe("yes");
     expect(
       Object.keys(options.defaultHeaders).some(

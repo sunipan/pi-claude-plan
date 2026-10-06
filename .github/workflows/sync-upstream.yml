@@ -1,0 +1,161 @@
+name: Sync upstream release
+
+on:
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.22.1
+          cache: npm
+
+      - name: Compare releases
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          based_on=$(node -p "require('./package.json').upstream.version")
+          latest_tag=$(gh api repos/ex-machina-co/opencode-anthropic-auth/releases/latest --jq .tag_name)
+          if ! [[ "$latest_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Unexpected upstream tag: ${latest_tag}"
+            exit 1
+          fi
+          latest=${latest_tag#v}
+          branch=upstream-sync/${latest_tag}
+
+          if [ "$(printf '%s\n%s\n' "$latest" "$based_on" | sort -V | tail -n1)" = "$based_on" ]; then
+            echo "Upstream ${latest_tag} is not newer than v${based_on}."
+            skip=true
+          elif [ "$(gh pr list --head "$branch" --state all --json number --jq length)" != 0 ]; then
+            echo "A pull request for ${branch} already exists."
+            skip=true
+          else
+            skip=false
+          fi
+
+          {
+            echo "skip=$skip"
+            echo "based_on=$based_on"
+            echo "latest=$latest"
+            echo "latest_tag=$latest_tag"
+            echo "branch=$branch"
+          } >> "$GITHUB_OUTPUT"
+
+      - if: steps.release.outputs.skip != 'true'
+        run: npm ci
+
+      - name: Sync versions
+        id: sync
+        if: steps.release.outputs.skip != 'true'
+        shell: bash
+        env:
+          LATEST: ${{ steps.release.outputs.latest }}
+        run: |
+          set -euo pipefail
+          node scripts/sync-upstream.ts "$LATEST" > "$RUNNER_TEMP/sync.json"
+          {
+            echo "cc_old=$(node -p "require(process.env.RUNNER_TEMP + '/sync.json').oldClaudeCodeVersion")"
+            echo "cc_new=$(node -p "require(process.env.RUNNER_TEMP + '/sync.json').newClaudeCodeVersion")"
+            echo "pkg_new=$(node -p "require(process.env.RUNNER_TEMP + '/sync.json').newPackageVersion")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check
+        id: check
+        if: steps.release.outputs.skip != 'true'
+        continue-on-error: true
+        run: npm run check
+
+      - name: Build PR body
+        if: steps.release.outputs.skip != 'true'
+        shell: bash
+        env:
+          BASED_ON: ${{ steps.release.outputs.based_on }}
+          LATEST_TAG: ${{ steps.release.outputs.latest_tag }}
+          PKG_NEW: ${{ steps.sync.outputs.pkg_new }}
+          CC_OLD: ${{ steps.sync.outputs.cc_old }}
+          CC_NEW: ${{ steps.sync.outputs.cc_new }}
+          CHECK_OUTCOME: ${{ steps.check.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          repo_url=https://github.com/ex-machina-co/opencode-anthropic-auth
+          if [ "$CHECK_OUTCOME" = success ]; then
+            check_line="\`npm run check\` passed."
+          else
+            check_line="\`npm run check\` FAILED — see run ${RUN_URL}"
+          fi
+
+          files=$(gh api "repos/ex-machina-co/opencode-anthropic-auth/compare/v${BASED_ON}...${LATEST_TAG}" \
+            --jq '.files[] | select(.filename | startswith("src/")) | "- `\(.filename)` (\(.status), +\(.additions) −\(.deletions))"')
+          [ -n "$files" ] || files="- none"
+
+          cat > "$RUNNER_TEMP/pr-body.md" <<EOF
+          ## Sync with upstream [${LATEST_TAG}](${repo_url}/releases/tag/${LATEST_TAG}) ([compare v${BASED_ON}...${LATEST_TAG}](${repo_url}/compare/v${BASED_ON}...${LATEST_TAG}))
+
+          Package version: \`${PKG_NEW}\` · Claude Code version: \`${CC_OLD}\` → \`${CC_NEW}\`
+
+          ${check_line}
+
+          ### Upstream source changes to review
+
+          ${files}
+
+          - [ ] Port relevant upstream source changes (the version sync above is automatic)
+          - [ ] Update README/CHANGELOG notes if behavior changed
+          - [ ] Merge to publish v${PKG_NEW} to npm
+          EOF
+
+      - name: Commit and open PR
+        if: steps.release.outputs.skip != 'true'
+        shell: bash
+        env:
+          BRANCH: ${{ steps.release.outputs.branch }}
+          LATEST_TAG: ${{ steps.release.outputs.latest_tag }}
+          CHECK_OUTCOME: ${{ steps.check.outcome }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add -A
+          git commit -m "chore: sync upstream $LATEST_TAG"
+          git push --force origin "$BRANCH"
+
+          draft=""
+          [ "$CHECK_OUTCOME" = success ] || draft=--draft
+          url=$(gh pr create --base main --head "$BRANCH" \
+            --title "Sync upstream $LATEST_TAG" \
+            --body-file "$RUNNER_TEMP/pr-body.md" \
+            --assignee "$GITHUB_REPOSITORY_OWNER" \
+            --reviewer "$GITHUB_REPOSITORY_OWNER" \
+            $draft)
+          echo "Opened $url"
+
+          for number in $(gh pr list --state open --json number,headRefName \
+            --jq '.[] | select(.headRefName | startswith("upstream-sync/")) | select(.headRefName != "'"$BRANCH"'") | .number'); do
+            gh pr close "$number" --delete-branch --comment "Superseded by $url"
+          done
+
+          # PRs opened with GITHUB_TOKEN don't trigger pull_request CI; dispatch it explicitly.
+          gh workflow run ci.yml --ref "$BRANCH"

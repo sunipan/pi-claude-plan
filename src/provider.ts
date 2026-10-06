@@ -4,7 +4,7 @@ import {
   type Provider,
 } from "@earendil-works/pi-ai";
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
-import { PROVIDER_ID, PROVIDER_NAME } from "./constants.js";
+import { CLAUDE_CODE_VERSION, PROVIDER_ID, PROVIDER_NAME } from "./constants.js";
 import { claudePlanOAuth } from "./oauth.js";
 import { streamClaudePlan, streamClaudePlanRaw } from "./streamer.js";
 
@@ -52,7 +52,9 @@ export function cloneAnthropicModels(
   }));
 }
 
-export function createClaudePlanProvider(): Provider<"anthropic-messages"> {
+export function createClaudePlanProvider(
+  claudeCodeVersion: string = CLAUDE_CODE_VERSION,
+): Provider<"anthropic-messages"> {
   const models = cloneAnthropicModels();
   return createProvider({
     id: PROVIDER_ID,
@@ -62,9 +64,19 @@ export function createClaudePlanProvider(): Provider<"anthropic-messages"> {
     models,
     api: {
       stream: (model, context, options) =>
-        streamClaudePlanRaw(model as Model<"anthropic-messages">, context, options),
+        streamClaudePlanRaw(
+          model as Model<"anthropic-messages">,
+          context,
+          options,
+          claudeCodeVersion,
+        ),
       streamSimple: (model, context, options) =>
-        streamClaudePlan(model as Model<"anthropic-messages">, context, options),
+        streamClaudePlan(
+          model as Model<"anthropic-messages">,
+          context,
+          options,
+          claudeCodeVersion,
+        ),
     },
   });
 }

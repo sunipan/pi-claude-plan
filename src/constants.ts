@@ -37,6 +37,9 @@ export const PI_TEXT_REPLACEMENTS = [
 
 export const CCH_SALT = "59cf53e54c78";
 export const CCH_POSITIONS = [4, 7, 20] as const;
-export const CLAUDE_CODE_VERSION = "2.1.87";
+export const CLAUDE_CODE_VERSION = "2.1.284";
 export const CLAUDE_CODE_ENTRYPOINT = "sdk-cli";
-export const USER_AGENT = "claude-cli/2.1.87 (external, cli)";
+
+export function formatUserAgent(version: string): string {
+  return `claude-cli/${version} (external, cli)`;
+}

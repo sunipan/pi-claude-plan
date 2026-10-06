@@ -4,7 +4,7 @@
 
 - **Project:** `@ex-machina/opencode-anthropic-auth`
 - **Repository:** https://github.com/ex-machina-co/opencode-anthropic-auth
-- **Upstream release this adaptation is based on:** [`v1.8.1`](https://github.com/ex-machina-co/opencode-anthropic-auth/releases/tag/v1.8.1)
+- **Upstream release this adaptation is based on:** [`v1.8.6`](https://github.com/ex-machina-co/opencode-anthropic-auth/releases/tag/v1.8.6)
 - **Copyright:** © 2026 Ex Machina
 - **License:** MIT
 

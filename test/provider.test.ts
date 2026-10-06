@@ -9,7 +9,10 @@ function sse(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
 
 describe("provider registration and model cloning", () => {
   it("clones the installed Anthropic catalog and changes only provider/name/cost", () => {
@@ -117,6 +120,7 @@ describe("provider registration and model cloning", () => {
   });
 
   it("registers one complete provider without overriding anthropic", () => {
+    vi.stubEnv("ANTHROPIC_CLAUDE_CODE_VERSION", undefined);
     const registered: unknown[] = [];
     registerExtension({
       registerProvider(provider: unknown) {
@@ -125,5 +129,26 @@ describe("provider registration and model cloning", () => {
     } as never);
     expect(registered).toHaveLength(1);
     expect(registered[0]).toMatchObject({ id: "claude-plan" });
+  });
+
+  it.each([
+    ["not-a-version", "error"],
+    ["2.1.0", "warning"],
+  ])("notifies on session_start for env %s at level %s", (value, level) => {
+    vi.stubEnv("ANTHROPIC_CLAUDE_CODE_VERSION", value);
+    const handlers: Array<[string, Function]> = [];
+    registerExtension({
+      registerProvider() {},
+      on: (event: string, handler: Function) => handlers.push([event, handler]),
+    } as never);
+    expect(handlers).toHaveLength(1);
+    expect(handlers[0]![0]).toBe("session_start");
+    const notify = vi.fn();
+    handlers[0]![1](undefined, { ui: { notify } });
+    expect(notify).toHaveBeenCalledOnce();
+    expect(notify).toHaveBeenCalledWith(
+      expect.stringContaining("ANTHROPIC_CLAUDE_CODE_VERSION"),
+      level,
+    );
   });
 });

@@ -11,6 +11,7 @@ import {
   type SimpleStreamOptions,
   type ThinkingLevel,
 } from "@earendil-works/pi-ai";
+import { CLAUDE_CODE_VERSION } from "./constants.js";
 import {
   buildAnthropicClientOptions,
   createToolNameMap,
@@ -157,6 +158,7 @@ function streamClaudePlanWithOptions(
   model: Model<"anthropic-messages">,
   context: Context,
   options: RawAnthropicOptions,
+  version: string,
 ): AssistantMessageEventStream {
   const accessToken = options.apiKey;
   if (!accessToken) {
@@ -190,6 +192,7 @@ function streamClaudePlanWithOptions(
       model.baseUrl,
       model.headers,
       options.headers,
+      version,
     ),
   );
   const callerPayloadHook = options.onPayload;
@@ -203,7 +206,7 @@ function streamClaudePlanWithOptions(
     client,
     maxTokens,
     onPayload: async (payload: unknown, hookModel: Model<Api>) => {
-      const fingerprinted = fingerprintRequestPayload(payload);
+      const fingerprinted = fingerprintRequestPayload(payload, version);
       const replacement = await callerPayloadHook?.(fingerprinted, hookModel);
       return replacement === undefined ? fingerprinted : replacement;
     },
@@ -222,14 +225,16 @@ export function streamClaudePlanRaw(
   model: Model<"anthropic-messages">,
   context: Context,
   options: RawAnthropicOptions = {},
+  version: string = CLAUDE_CODE_VERSION,
 ): AssistantMessageEventStream {
-  return streamClaudePlanWithOptions(model, context, options);
+  return streamClaudePlanWithOptions(model, context, options, version);
 }
 
 export function streamClaudePlan(
   model: Model<"anthropic-messages">,
   context: Context,
   options: SimpleStreamOptions = {},
+  version: string = CLAUDE_CODE_VERSION,
 ): AssistantMessageEventStream {
   const mapped: RawAnthropicOptions = { ...options };
   if (!options.reasoning) {
@@ -252,5 +257,5 @@ export function streamClaudePlan(
       Math.max(0, expandedMax - 1024),
     );
   }
-  return streamClaudePlanWithOptions(model, context, mapped);
+  return streamClaudePlanWithOptions(model, context, mapped, version);
 }
