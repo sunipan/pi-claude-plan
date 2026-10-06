@@ -1,6 +1,6 @@
 {
   "name": "pi-claude-plan",
-  "version": "1.8.2",
+  "version": "1.8.6",
   "type": "module",
   "description": "Unofficial Pi provider for attempting Claude Pro/Max plan routing without replacing Pi's built-in Anthropic provider.",
   "license": "MIT",
@@ -37,7 +37,7 @@
   },
   "upstream": {
     "name": "@ex-machina/opencode-anthropic-auth",
-    "version": "1.8.1",
+    "version": "1.8.6",
     "url": "https://github.com/ex-machina-co/opencode-anthropic-auth"
   },
   "scripts": {

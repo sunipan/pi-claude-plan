@@ -3,12 +3,13 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { buildBillingHeaderValue } from "./cch.js";
 import {
   CLAUDE_AGENT_IDENTITY,
+  CLAUDE_CODE_VERSION,
   PI_IDENTITY_PREFIX,
   PI_PARAGRAPH_REMOVAL_ANCHORS,
   PI_TEXT_REPLACEMENTS,
   REQUIRED_BETAS,
   TOOL_PREFIX,
-  USER_AGENT,
+  formatUserAgent,
 } from "./constants.js";
 
 type UnknownRecord = Record<string, unknown>;
@@ -61,6 +62,7 @@ function toSystemBlocks(system: unknown): SystemBlock[] {
 export function buildFingerprintSystem(
   system: unknown,
   messages: Array<{ role?: string; content?: unknown }>,
+  version: string = CLAUDE_CODE_VERSION,
 ): SystemBlock[] {
   const blocks = toSystemBlocks(system);
   const identityIndex = blocks.findIndex(
@@ -77,6 +79,7 @@ export function buildFingerprintSystem(
           role?: string;
           content?: string | Array<{ type?: string; text?: string }>;
         }>,
+        version,
       ),
     });
   }
@@ -148,7 +151,10 @@ function prefixPayloadTools(payload: UnknownRecord): void {
   }
 }
 
-export function fingerprintRequestPayload(payload: unknown): unknown {
+export function fingerprintRequestPayload(
+  payload: unknown,
+  version: string = CLAUDE_CODE_VERSION,
+): unknown {
   if (!isRecord(payload)) return payload;
   const transformed: UnknownRecord = { ...payload };
   const messages = Array.isArray(transformed.messages)
@@ -157,7 +163,7 @@ export function fingerprintRequestPayload(payload: unknown): unknown {
         content?: unknown;
       }>)
     : [];
-  transformed.system = buildFingerprintSystem(transformed.system, messages);
+  transformed.system = buildFingerprintSystem(transformed.system, messages, version);
   prefixPayloadTools(transformed);
   return transformed;
 }
@@ -165,6 +171,7 @@ export function fingerprintRequestPayload(payload: unknown): unknown {
 export function buildRequestHeaders(
   modelHeaders?: Record<string, string>,
   optionHeaders?: ProviderHeaders,
+  version: string = CLAUDE_CODE_VERSION,
 ): Record<string, string> {
   const headers: Record<string, string> = {};
   const betaFeatures = new Set<string>(REQUIRED_BETAS);
@@ -191,7 +198,7 @@ export function buildRequestHeaders(
   headers.accept = "application/json";
   headers["anthropic-dangerous-direct-browser-access"] = "true";
   headers["anthropic-beta"] = [...betaFeatures].join(",");
-  headers["user-agent"] = USER_AGENT;
+  headers["user-agent"] = formatUserAgent(version);
   headers["x-app"] = "cli";
   return headers;
 }
@@ -201,13 +208,14 @@ export function buildAnthropicClientOptions(
   baseURL: string,
   modelHeaders?: Record<string, string>,
   optionHeaders?: ProviderHeaders,
+  version: string = CLAUDE_CODE_VERSION,
 ): ConstructorParameters<typeof Anthropic>[0] {
   return {
     apiKey: null,
     authToken: accessToken,
     baseURL,
     defaultQuery: { beta: "true" },
-    defaultHeaders: buildRequestHeaders(modelHeaders, optionHeaders),
+    defaultHeaders: buildRequestHeaders(modelHeaders, optionHeaders, version),
     dangerouslyAllowBrowser: true,
   };
 }

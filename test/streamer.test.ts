@@ -182,6 +182,7 @@ describe("custom Anthropic streamer (offline)", () => {
         onPayload: payloadHook,
         onResponse: responseHook,
       },
+      "9.9.9",
     )) {
       events.push(event);
     }
@@ -189,6 +190,10 @@ describe("custom Anthropic streamer (offline)", () => {
     expect(payloadHook).toHaveBeenCalledOnce();
     expect(responseHook).toHaveBeenCalledOnce();
     expect(requestHeaders.get("x-host-hook")).toBe("present");
+    expect(requestHeaders.get("user-agent")).toBe("claude-cli/9.9.9 (external, cli)");
+    expect((requestPayload.system as Array<{ text: string }>)[0]?.text).toMatch(
+      /^x-anthropic-billing-header: cc_version=9\.9\.9\./,
+    );
     expect(requestPayload).not.toHaveProperty("fallbacks");
     expect(requestPayload.metadata).toEqual({ user_id: "offline-claude-plan" });
     expect(events.at(-1)).toMatchObject({ type: "done" });

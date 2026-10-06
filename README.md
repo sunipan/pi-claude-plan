@@ -14,13 +14,13 @@ The zero costs shown by Pi are local display metadata only. Check your Anthropic
 Install the pinned npm release:
 
 ```sh
-pi install npm:pi-claude-plan@1.8.2
+pi install npm:pi-claude-plan@1.8.6
 ```
 
 Alternatively, install the matching GitHub release:
 
 ```sh
-pi install git:github.com/sunipan/pi-claude-plan@v1.8.2
+pi install git:github.com/sunipan/pi-claude-plan@v1.8.6
 ```
 
 Restart Pi or run:
@@ -52,7 +52,9 @@ The matching Git tag can also be installed as `git:github.com/sunipan/pi-claude-
 
 ## Versioning and upstream alignment
 
-The request behavior remains adapted from [`@ex-machina/opencode-anthropic-auth` v1.8.1](https://github.com/ex-machina-co/opencode-anthropic-auth/releases/tag/v1.8.1). Package version `1.8.2` is a Pi compatibility patch on that baseline; it does not claim a corresponding upstream `v1.8.2` release.
+The request behavior is adapted from [`@ex-machina/opencode-anthropic-auth` v1.8.6](https://github.com/ex-machina-co/opencode-anthropic-auth/releases/tag/v1.8.6). Package versions follow upstream releases; Pi-only patches take the next unused patch version, so a package version does not always have a matching upstream release.
+
+A daily GitHub Actions workflow checks for new upstream releases. For each one it opens a pull request that syncs the reported Claude Code version, runs the offline validation suite, and lists any other upstream source changes for manual review. Merging a version change to `main` publishes it to npm with provenance and creates the matching GitHub release.
 
 This package is not published, maintained, or supported by Ex Machina. Upstream changes require separate compatibility review and testing before adoption.
 
@@ -69,12 +71,17 @@ The provider clones Pi's installed built-in Anthropic model catalog while preser
 
 Streaming delegates message conversion and event handling to Pi's Anthropic Messages implementation, preserving images, tool results, thinking signatures, adaptive and budget thinking, cancellation, retries, hooks, usage, and errors as closely as possible.
 
+### Reported Claude Code version
+
+Anthropic gates model access on the Claude Code version reported in the `user-agent` header and billing block. This release reports `2.1.284`. To report a different version without waiting for a release, set `ANTHROPIC_CLAUDE_CODE_VERSION` to a `major.minor.patch` value and restart Pi. Invalid values are ignored and shown as an error; versions older than the bundled one are used but shown as a warning, since they can make newer models reject requests.
+
 ### Pi compatibility
 
-Version `1.8.2` targets and is release-tested with Pi AI and Pi Coding Agent `0.84.4` on Node.js `22.22.1`. Pi AI `0.84.3` introduced Anthropic fallback-routing metadata that `pi-claude-plan` `1.8.1` copied without the matching transport beta, causing Claude to reject affected requests with `fallbacks: Extra inputs are not permitted`. Version `1.8.2` removes only that provider-specific metadata from its cloned models and leaves Pi's built-in catalog unchanged.
+This package targets Pi AI and Pi Coding Agent `0.84.4` on Node.js `22.22.1`. Pi AI `0.84.3` introduced Anthropic fallback-routing metadata that `pi-claude-plan` `1.8.1` copied without the matching transport beta, causing Claude to reject affected requests with `fallbacks: Extra inputs are not permitted`. Version `1.8.2` removes only that provider-specific metadata from its cloned models and leaves Pi's built-in catalog unchanged.
 
 | Pi runtime | `pi-claude-plan` | Status |
 | --- | --- | --- |
+| `0.84.4` | `1.8.6` | Automated provider, payload, and actual-loader validation |
 | `0.84.4` | `1.8.2` | Automated provider, payload, actual-loader, and credential-safe live validation |
 | `0.84.3` | `1.8.2` | Fix applies to the introduced metadata; not a separate release-test lane |
 | `0.82.1` | `1.8.1` | Previous development target; not release-tested for `1.8.2` |
